@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 const TacticalBoardCanvas = dynamic(() => import("./TacticalBoardCanvas"), {
   ssr: false,
   loading: () => (
-    <div className="mx-auto flex h-96 max-w-5xl items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-slate-950 text-slate-400" role="status">
       Đang tải sa bàn…
     </div>
   ),

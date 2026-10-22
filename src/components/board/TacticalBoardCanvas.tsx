@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 
 import { Arrow, Circle, Group, Layer, Line, Rect, Stage } from "react-konva";
 
-import { Download, Save, Upload } from "lucide-react";
+import Header from "@/components/Header";
 
 import type { Stage as KonvaStage } from "konva/lib/Stage";
 import type { KonvaEventObject } from "konva/lib/Node";
@@ -59,10 +59,6 @@ const TOOL_HINTS: Record<DrawingTool, string> = {
   line: "Giữ và kéo chuột để vẽ đường thẳng.",
 };
 
-const EXPORT_BUTTON_CLASS =
-  "inline-flex items-center gap-2 rounded-lg border border-slate-600 " +
-  "px-3 py-2 text-sm text-slate-200 enabled:hover:bg-slate-700 " +
-  "disabled:cursor-not-allowed disabled:opacity-40";
 
 function getPitchPoint(event: DrawingEvent): Point | null {
   const stage = event.target.getStage();
@@ -156,6 +152,9 @@ export default function TacticalBoardCanvas() {
 
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [drawingColor, setDrawingColor] = useState("#FFFFFF");
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+  const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<DrawingTool>("select");
 
   const [preview, setPreview] = useState<TacticalLine | null>(null);
@@ -310,6 +309,7 @@ export default function TacticalBoardCanvas() {
     setCurrentFrameIndex(0);
     setActiveTool("select");
     setActivePreset(preset.id);
+    setMobileLibraryOpen(false);
     setSpeed(1);
     setMessage(`Đã nạp ${preset.title}. Bấm Play để xem chuyển động.`);
   }
@@ -334,18 +334,6 @@ export default function TacticalBoardCanvas() {
     setHasChosenPitch(true);
     setShowPitchSelector(false);
     setMessage(`Đã mở sân Futsal ${nextPitchType === "full" ? "Full" : "Half"}.`);
-  }
-
-  function openPitchSelector() {
-    // Giữ vị trí đang xem, tạm dừng hoạt cảnh trong lúc lựa chọn.
-    if (isImporting) return;
-    if (animationRequestRef.current !== null) {
-      window.cancelAnimationFrame(animationRequestRef.current);
-      animationRequestRef.current = null;
-    }
-    setIsPlaying(false);
-    cancelDrawing();
-    setShowPitchSelector(true);
   }
 
   function selectFrame(index: number) {
@@ -451,7 +439,7 @@ export default function TacticalBoardCanvas() {
     setDraft({
       id: crypto.randomUUID(),
       points: [point.x, point.y, point.x, point.y],
-      color: activeTool === "dashed-arrow" ? "#FDE047" : "#FFFFFF",
+      color: drawingColor,
       isDashed: activeTool === "dashed-arrow",
       hasArrow: activeTool !== "line",
     });
@@ -658,103 +646,32 @@ export default function TacticalBoardCanvas() {
   }
 
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-    <PitchSelectorModal open={showPitchSelector} currentPitchType={pitchType}
-      canDismiss={hasChosenPitch} onSelect={choosePitch} onClose={() => setShowPitchSelector(false)} />
-    <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
-      {/* Chỉ khóa công cụ chỉnh sửa; nút tạo bài mới vẫn dùng được khi Play/Pause. */}
-        <Toolbar
-          pitchType={pitchType}
-          onChangePitch={openPitchSelector}
-          activeTool={activeTool}
-          canUndo={currentFrame.lines.length > 0}
-          onToolChange={changeTool}
-          onUndo={undoLine}
-          onClearAll={clearAllLines}
-          onReset={handleFullReset}
-          disabled={editingLocked}
-          resetDisabled={isImporting || showPitchSelector}
-        />
-
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-700 p-4">
-        <button
-          type="button"
-          className={EXPORT_BUTTON_CLASS}
-          disabled={isImporting || preview !== null}
-          onClick={exportPng}
-        >
-          <Download size={17} />
-          Tải ảnh Sa bàn
-        </button>
-
-        <button
-          type="button"
-          className={EXPORT_BUTTON_CLASS}
-          disabled={isImporting || preview !== null}
-          onClick={exportJson}
-        >
-          <Save size={17} />
-          Lưu bài đánh (.json)
-        </button>
-
-        <button
-          type="button"
-          className={EXPORT_BUTTON_CLASS}
-          disabled={isPlaying || isImporting || preview !== null}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Upload size={17} />
-          {isImporting ? "Đang mở..." : "Mở file bài đánh"}
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".json,application/json"
-          className="hidden"
-          onChange={importJson}
-        />
-      </div>
-
-      {message && (
-        <p
-          role="status"
-          className="border-b border-slate-700 px-5 py-3 text-sm text-amber-300"
-        >
-          {message}
-        </p>
-      )}
-
-      <div className="flex flex-wrap justify-between gap-2 px-5 pt-4 text-sm">
-        <p className="text-slate-300">
-          {isPreviewing
-            ? isPlaying
-              ? "Đang phát hoạt cảnh..."
-              : "Đã tạm dừng. Bấm Tiếp tục hoặc chọn một frame để sửa."
-            : TOOL_HINTS[activeTool]}
-        </p>
-
-        <span className="text-slate-400">
-          Frame {visibleFrameIndex + 1}/{frames.length}
-          {" · "}
-          {displayFrame.lines.length} nét vẽ
-        </span>
-      </div>
-
-      <div ref={containerRef} className="w-full min-w-0 overflow-hidden" aria-label="Sa bàn tương tác: kéo cầu thủ hoặc chọn công cụ để vẽ">
-        <div
-          className="mx-auto"
-          style={{
-            width: stageWidth * scale,
-            height: STAGE_HEIGHT * scale,
-            cursor:
-              editingLocked || activeTool === "select"
-                ? "default"
-                : "crosshair",
-            touchAction: "none",
-          }}
-        >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <PitchSelectorModal open={showPitchSelector} currentPitchType={pitchType}
+        canDismiss={hasChosenPitch} onSelect={choosePitch} onClose={() => setShowPitchSelector(false)} />
+      <Header pitchType={pitchType} onPitchChange={choosePitch}
+        disabled={isImporting || preview !== null || showPitchSelector}
+        importDisabled={isPlaying || isImporting || preview !== null || showPitchSelector}
+        resetDisabled={isImporting || showPitchSelector}
+        onExportPng={exportPng} onExportJson={exportJson}
+        onImportJson={() => fileInputRef.current?.click()} onReset={handleFullReset}
+        onOpenLibrary={() => setMobileLibraryOpen(true)} />
+      <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" aria-label="Mở file chiến thuật JSON" onChange={importJson} />
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Sa bàn chiến thuật">
+          <div className="workspace-grid flex min-h-0 flex-1 flex-col">
+            <div className="workspace-heading flex h-12 shrink-0 items-center justify-between gap-3 px-5">
+              <div className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-slate-500"><span className={`size-1.5 rounded-full ${isPlaying ? "bg-emerald-400" : "bg-slate-500"}`} /> {isPlaying ? "ANIMATION LIVE" : "TACTICAL WORKSPACE"}</div>
+              <span className="rounded-md border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-[10px] text-slate-400">{pitchType === "full" ? "FULL COURT · 40 × 20 M" : "HALF COURT · 20 × 20 M"}</span>
+            </div>
+            <div className="relative min-h-0 flex-1">
+              <Toolbar activeTool={activeTool} color={drawingColor} onColorChange={color => { cancelDrawing(); setDrawingColor(color); }}
+                canUndo={currentFrame.lines.length > 0} onToolChange={changeTool}
+                onUndo={undoLine} onClearAll={clearAllLines} disabled={editingLocked} />
+              <div className="canvas-space">
+                <div ref={containerRef} className="stage-fit" aria-label="Sa bàn tương tác">
+                  <div className="shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-800 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
+                    style={{ width: stageWidth * scale, height: STAGE_HEIGHT * scale, touchAction: "none", cursor: editingLocked || activeTool === "select" ? "default" : "crosshair" }}>
           <Stage
             ref={stageRef}
             width={stageWidth * scale}
@@ -830,30 +747,25 @@ export default function TacticalBoardCanvas() {
               </Group>
             </Layer>
           </Stage>
-        </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="workspace-status flex h-9 shrink-0 items-center justify-between gap-4 px-5 text-[11px] text-slate-500">
+              <p role="status" className="min-w-0 truncate" title={message}>{message || (isPreviewing ? isPlaying ? "Đang phát hoạt cảnh…" : "Đã tạm dừng. Chọn một frame để tiếp tục chỉnh sửa." : TOOL_HINTS[activeTool])}</p>
+              <span className="hidden shrink-0 items-center gap-3 sm:flex"><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-red-400" /> HOME</span><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-blue-400" /> AWAY</span><span>{activePreset !== null ? `${Math.round(transitionDuration / speed)} ms/frame` : `${displayFrame.lines.length} nét vẽ`}</span></span>
+            </div>
+          </div>
+          <FrameTimeline pitchType={pitchType} frames={frames} currentFrameIndex={visibleFrameIndex}
+            isPlaying={isPlaying} isPreviewing={isPreviewing} busy={isImporting || showPitchSelector}
+            speed={speed} onSelect={selectFrame} onAdd={addFrame} onDelete={deleteFrame}
+            onTogglePlay={togglePlayback} onSpeedChange={setSpeed} />
+        </section>
+        <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null || showPitchSelector}
+          activePreset={activePreset} onLoad={loadPreset} expanded={sidebarExpanded}
+          mobileOpen={mobileLibraryOpen} onToggleExpanded={() => setSidebarExpanded(value => !value)}
+          onCloseMobile={() => setMobileLibraryOpen(false)} />
       </div>
-
-      {activePreset !== null && (
-        <p className="px-4 py-2 text-xs text-emerald-300" role="status">
-          Bài mẫu: {Math.round(transitionDuration / speed)} ms/chuyển frame ·
-          {" "}{((frames.length - 1) * transitionDuration / speed / 1000).toFixed(1)} giây toàn bài
-        </p>
-      )}
-      <FrameTimeline
-        frames={frames}
-        currentFrameIndex={visibleFrameIndex}
-        isPlaying={isPlaying}
-        isPreviewing={isPreviewing}
-        busy={isImporting}
-        speed={speed}
-        onSelect={selectFrame}
-        onAdd={addFrame}
-        onDelete={deleteFrame}
-        onTogglePlay={togglePlayback}
-        onSpeedChange={setSpeed}
-      />
-    </section>
-    <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null} activePreset={activePreset} onLoad={loadPreset} />
     </div>
   );
 }
