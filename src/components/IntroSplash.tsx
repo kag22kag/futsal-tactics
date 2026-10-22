@@ -119,7 +119,7 @@ export default function IntroSplash({ onComplete }: IntroSplashProps) {
             id="intro-title"
             className="text-3xl font-black tracking-tight sm:text-5xl"
           >
-            FUTSAL TACTICS <span className="text-emerald-400">PRO</span>
+            SA BÀN <span className="text-emerald-400">FUTSAL</span>
           </h2>
           <p className="mt-5 text-sm text-slate-400 sm:text-base">
             Nền tảng Phân tích Chiến thuật Futsal 5v5 Top #1

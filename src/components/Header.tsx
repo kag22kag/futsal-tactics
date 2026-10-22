@@ -21,7 +21,7 @@ export default function Header(props: Props) {
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex items-center gap-2.5">
           <span className="grid size-10 place-items-center rounded-xl border border-emerald-400/25 bg-emerald-400/10 text-emerald-400"><Goal size={24} /></span>
-          <div><h1 className="text-xs font-black tracking-wider sm:text-sm">FUTSAL TACTICS <span className="text-emerald-400">PRO</span></h1>
+          <div><h1 className="text-xs font-black tracking-wider sm:text-sm">SA BÀN <span className="text-emerald-400">FUTSAL</span></h1>
             <p className="mt-0.5 flex items-center gap-2 text-[10px] tracking-widest text-slate-500">TACTICAL WORKSPACE <span className="rounded border border-slate-700 px-1 text-slate-400">v1.0</span></p>
           </div>
         </div>
