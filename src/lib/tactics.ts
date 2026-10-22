@@ -2,6 +2,7 @@ import type {
   Ball,
   Frame,
   Player,
+  PitchType,
   TacticalLine,
   TacticsDocument,
 } from "@/types/tactics";
@@ -11,7 +12,7 @@ import {
   MAX_FRAMES,
   MAX_LINES,
   PITCH_HEIGHT,
-  PITCH_WIDTH,
+  getPitchDimensions,
   PLAYER_RADIUS,
 } from "@/constants/board";
 
@@ -145,7 +146,7 @@ function readBoolean(value: unknown, label: string): boolean {
   return value;
 }
 
-function readPlayer(value: unknown): Player {
+function readPlayer(value: unknown, pitchType: PitchType): Player {
   const item = record(value);
 
   if (item.team !== "home" && item.team !== "away") {
@@ -167,7 +168,7 @@ function readPlayer(value: unknown): Player {
     x: readNumber(
       item.x,
       PLAYER_RADIUS,
-      PITCH_WIDTH - PLAYER_RADIUS,
+      getPitchDimensions(pitchType).width - PLAYER_RADIUS,
       "Tọa độ x cầu thủ",
     ),
     y: readNumber(
@@ -179,14 +180,14 @@ function readPlayer(value: unknown): Player {
   };
 }
 
-function readBall(value: unknown): Ball {
+function readBall(value: unknown, pitchType: PitchType): Ball {
   const item = record(value);
 
   return {
     x: readNumber(
       item.x,
       BALL_RADIUS,
-      PITCH_WIDTH - BALL_RADIUS,
+      getPitchDimensions(pitchType).width - BALL_RADIUS,
       "Tọa độ x bóng",
     ),
     y: readNumber(
@@ -198,7 +199,7 @@ function readBall(value: unknown): Ball {
   };
 }
 
-function readLine(value: unknown): TacticalLine {
+function readLine(value: unknown, pitchType: PitchType): TacticalLine {
   const item = record(value);
 
   if (!Array.isArray(item.points) || item.points.length !== 4) {
@@ -209,7 +210,7 @@ function readLine(value: unknown): TacticalLine {
     readNumber(
       point,
       0,
-      index % 2 === 0 ? PITCH_WIDTH : PITCH_HEIGHT,
+      index % 2 === 0 ? getPitchDimensions(pitchType).width : PITCH_HEIGHT,
       "Tọa độ nét vẽ",
     ),
   );
@@ -229,7 +230,7 @@ function readLine(value: unknown): TacticalLine {
   };
 }
 
-function readFrame(value: unknown): Frame {
+function readFrame(value: unknown, pitchType: PitchType): Frame {
   const item = record(value);
 
   if (!Array.isArray(item.players) || item.players.length !== 10) {
@@ -240,8 +241,8 @@ function readFrame(value: unknown): Frame {
     return fail(`Mỗi frame được chứa tối đa ${MAX_LINES} nét vẽ.`);
   }
 
-  const players = item.players.map((player: unknown) => readPlayer(player));
-  const lines = item.lines.map((line: unknown) => readLine(line));
+  const players = item.players.map((player: unknown) => readPlayer(player, pitchType));
+  const lines = item.lines.map((line: unknown) => readLine(line, pitchType));
 
   if (new Set(players.map((player) => player.id)).size !== 10) {
     return fail("ID cầu thủ trong một frame không được trùng nhau.");
@@ -256,16 +257,16 @@ function readFrame(value: unknown): Frame {
 
     if (
       members.length !== 5 ||
-      members.filter((player) => player.isGK).length !== 1
+      members.filter((player) => player.isGK).length !== (pitchType === "half" && team === "home" ? 0 : 1)
     ) {
-      return fail("Mỗi đội phải có 5 cầu thủ, trong đó có đúng 1 thủ môn.");
+      return fail(pitchType === "full" ? "Mỗi đội phải có 5 cầu thủ và 1 thủ môn." : "Nửa sân cần 5 cầu thủ đỏ tấn công; đội xanh có 4 hậu vệ và 1 thủ môn.");
     }
   }
 
   return {
     id: readText(item.id, "ID frame"),
     players,
-    ball: readBall(item.ball),
+    ball: readBall(item.ball, pitchType),
     lines,
   };
 }
@@ -281,8 +282,8 @@ export function parseTacticsJson(text: string): TacticsDocument {
 
   const item = record(value);
 
-  if (item.format !== "futsal-tactics" || item.version !== 1) {
-    return fail("File không đúng định dạng bài đánh Futsal phiên bản 1.");
+  if (item.format !== "futsal-tactics" || (item.version !== 1 && item.version !== 2)) {
+    return fail("File không đúng định dạng bài đánh Futsal phiên bản 1 hoặc 2.");
   }
 
   if (
@@ -293,7 +294,10 @@ export function parseTacticsJson(text: string): TacticsDocument {
     return fail(`Bài đánh phải có từ 1 đến ${MAX_FRAMES} frame.`);
   }
 
-  const frames = item.frames.map((frame: unknown) => readFrame(frame));
+  const pitchType: PitchType = item.version === 1 ? "full"
+    : item.pitchType === "full" || item.pitchType === "half" ? item.pitchType
+    : fail("Loại sân trong file JSON không hợp lệ.");
+  const frames = item.frames.map((frame: unknown) => readFrame(frame, pitchType));
   const firstFrame = frames[0];
 
   if (!firstFrame) {
@@ -338,7 +342,8 @@ export function parseTacticsJson(text: string): TacticsDocument {
 
   return {
     format: "futsal-tactics",
-    version: 1,
+    version: 2,
+    pitchType,
     currentFrameIndex,
     frames,
   };

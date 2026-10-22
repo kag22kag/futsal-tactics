@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 
 import type { LucideIcon } from "lucide-react";
-import type { DrawingTool } from "@/types/tactics";
+import type { DrawingTool, PitchType } from "@/types/tactics";
 
 interface ToolbarProps {
+  pitchType: PitchType;
+  onChangePitch: () => void;
   activeTool: DrawingTool;
   canUndo: boolean;
   disabled: boolean;
@@ -61,6 +63,8 @@ const BUTTON_CLASS =
   "disabled:cursor-not-allowed disabled:opacity-40";
 
 export default function Toolbar({
+  pitchType,
+  onChangePitch,
   activeTool,
   canUndo,
   disabled,
@@ -101,6 +105,10 @@ export default function Toolbar({
         })}
       </div>
 
+      <button type="button" onClick={onChangePitch} disabled={resetDisabled}
+        className={`${BUTTON_CLASS} border-emerald-500/40 text-emerald-300`}>
+        Futsal {pitchType === "full" ? "Full" : "Half"} · Đổi sân
+      </button>
       <div
         role="group"
         aria-label="Thao tác với sa bàn"

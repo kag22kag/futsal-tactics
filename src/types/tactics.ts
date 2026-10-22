@@ -1,3 +1,5 @@
+export type PitchType = "full" | "half";
+
 export interface Player {
   id: string;
   x: number;
@@ -33,7 +35,16 @@ export interface Frame {
 // Định dạng file JSON do ứng dụng xuất ra.
 export interface TacticsDocument {
   format: "futsal-tactics";
-  version: 1;
+  version: 2;
+  pitchType: PitchType;
   currentFrameIndex: number;
+  frames: Frame[];
+}
+
+export interface Preset {
+  id: string;
+  title: string;
+  description: string;
+  pitchType: PitchType;
   frames: Frame[];
 }

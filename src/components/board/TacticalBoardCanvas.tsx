@@ -9,7 +9,7 @@ import { Download, Save, Upload } from "lucide-react";
 import type { Stage as KonvaStage } from "konva/lib/Stage";
 import type { KonvaEventObject } from "konva/lib/Node";
 
-import type { Ball, DrawingTool, Frame, TacticalLine } from "@/types/tactics";
+import type { Ball, DrawingTool, Frame, TacticalLine, PitchType } from "@/types/tactics";
 
 import {
   BALL_RADIUS,
@@ -18,9 +18,8 @@ import {
   MAX_LINES,
   PADDING,
   PITCH_HEIGHT,
-  PITCH_WIDTH,
+  getPitchDimensions,
   STAGE_HEIGHT,
-  STAGE_WIDTH,
   createInitialFrame,
 } from "@/constants/board";
 
@@ -37,6 +36,7 @@ import FutsalPitch from "./FutsalPitch";
 import FrameTimeline from "./FrameTimeline";
 import PlayerToken from "./PlayerToken";
 import Toolbar from "./Toolbar";
+import PitchSelectorModal from "./PitchSelectorModal";
 import PlaybookPresets from "./PlaybookPresets";
 import type { PlaybookPreset } from "@/constants/presets";
 import { useBoardScale } from "@/hooks/useBoardScale";
@@ -77,16 +77,16 @@ function getPitchPoint(event: DrawingEvent): Point | null {
   };
 }
 
-function isInsidePitch(point: Point): boolean {
+function isInsidePitch(point: Point, pitchWidth: number): boolean {
   return (
     point.x >= 0 &&
-    point.x <= PITCH_WIDTH &&
+    point.x <= pitchWidth &&
     point.y >= 0 &&
     point.y <= PITCH_HEIGHT
   );
 }
 
-function updateLineEnd(line: TacticalLine, point: Point): TacticalLine {
+function updateLineEnd(line: TacticalLine, point: Point, pitchWidth: number): TacticalLine {
   const [startX, startY] = line.points;
 
   if (startX === undefined || startY === undefined) {
@@ -98,7 +98,7 @@ function updateLineEnd(line: TacticalLine, point: Point): TacticalLine {
     points: [
       startX,
       startY,
-      clamp(point.x, 0, PITCH_WIDTH),
+      clamp(point.x, 0, pitchWidth),
       clamp(point.y, 0, PITCH_HEIGHT),
     ],
   };
@@ -145,9 +145,13 @@ function TacticalShape({
 }
 
 export default function TacticalBoardCanvas() {
-  const { containerRef, scale } = useBoardScale();
+  const [pitchType, setPitchType] = useState<PitchType>("full");
+  const [hasChosenPitch, setHasChosenPitch] = useState(false);
+  const [showPitchSelector, setShowPitchSelector] = useState(true);
+  const { width: pitchWidth, stageWidth } = getPitchDimensions(pitchType);
+  const { containerRef, scale } = useBoardScale(stageWidth);
   // Toàn bộ dữ liệu chỉnh sửa nằm trong frames.
-  const [frames, setFrames] = useState<Frame[]>(() => [createInitialFrame()]);
+  const [frames, setFrames] = useState<Frame[]>(() => [createInitialFrame(pitchType)]);
 
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [activePreset, setActivePreset] = useState<string | null>(null);
@@ -172,12 +176,12 @@ export default function TacticalBoardCanvas() {
   const [message, setMessage] = useState("");
 
   const isPreviewing = playbackPosition !== null;
-  const editingLocked = isPreviewing || isImporting;
+  const editingLocked = isPreviewing || isImporting || showPitchSelector;
   const canDrag = !editingLocked && activeTool === "select";
 
   // Frame luôn tồn tại vì không cho xóa frame cuối cùng.
   const currentFrame =
-    frames[currentFrameIndex] ?? frames[0] ?? createInitialFrame();
+    frames[currentFrameIndex] ?? frames[0] ?? createInitialFrame(pitchType);
 
   const visibleFrameIndex =
     playbackPosition === null
@@ -292,7 +296,7 @@ export default function TacticalBoardCanvas() {
   // ---------- Quản lý frame ----------
 
   function loadPreset(preset: PlaybookPreset) {
-    if (isImporting) return;
+    if (isImporting || preset.pitchType !== pitchType) return;
     stopPlayback();
     cancelDrawing();
     // Sao chép sâu để sửa bài không làm thay đổi thư viện mẫu.
@@ -301,6 +305,40 @@ export default function TacticalBoardCanvas() {
     setActiveTool("select");
     setActivePreset(preset.id);
     setMessage(`Đã nạp ${preset.title}. Bấm Play để xem chuyển động.`);
+  }
+
+  function choosePitch(nextPitchType: PitchType) {
+    if (isImporting) return;
+    if (hasChosenPitch && nextPitchType === pitchType) {
+      setShowPitchSelector(false);
+      return;
+    }
+    if (hasChosenPitch && !window.confirm(
+      "Đổi loại sân sẽ xóa các frame và tạo bài mới. Chọn Hủy để quay lại lưu JSON trước.",
+    )) return;
+    stopPlayback();
+    cancelDrawing();
+    setPitchType(nextPitchType);
+    setFrames([createInitialFrame(nextPitchType)]);
+    setCurrentFrameIndex(0);
+    setActivePreset(null);
+    setActiveTool("select");
+    setSpeed(1);
+    setHasChosenPitch(true);
+    setShowPitchSelector(false);
+    setMessage(`Đã mở sân Futsal ${nextPitchType === "full" ? "Full" : "Half"}.`);
+  }
+
+  function openPitchSelector() {
+    // Giữ vị trí đang xem, tạm dừng hoạt cảnh trong lúc lựa chọn.
+    if (isImporting) return;
+    if (animationRequestRef.current !== null) {
+      window.cancelAnimationFrame(animationRequestRef.current);
+      animationRequestRef.current = null;
+    }
+    setIsPlaying(false);
+    cancelDrawing();
+    setShowPitchSelector(true);
   }
 
   function selectFrame(index: number) {
@@ -395,7 +433,7 @@ export default function TacticalBoardCanvas() {
 
     const point = getPitchPoint(event);
 
-    if (!point || !isInsidePitch(point)) {
+    if (!point || !isInsidePitch(point, pitchWidth)) {
       return;
     }
 
@@ -438,7 +476,7 @@ export default function TacticalBoardCanvas() {
       event.evt.preventDefault();
     }
 
-    setDraft(updateLineEnd(draft, point));
+    setDraft(updateLineEnd(draft, point, pitchWidth));
   }
 
   function handleDrawingEnd(event: DrawingEvent) {
@@ -449,7 +487,7 @@ export default function TacticalBoardCanvas() {
     }
 
     const point = getPitchPoint(event);
-    const completedLine = point ? updateLineEnd(draft, point) : draft;
+    const completedLine = point ? updateLineEnd(draft, point, pitchWidth) : draft;
 
     if (hasValidLength(completedLine)) {
       editCurrentFrame((frame) => ({
@@ -490,7 +528,7 @@ export default function TacticalBoardCanvas() {
 
     stopPlayback();
     cancelDrawing();
-    setFrames([createInitialFrame()]);
+    setFrames([createInitialFrame(pitchType)]);
     setCurrentFrameIndex(0);
     setActivePreset(null);
     setActiveTool("select");
@@ -513,7 +551,7 @@ export default function TacticalBoardCanvas() {
     const node = event.target;
 
     const position: Ball = {
-      x: clamp(node.x(), BALL_RADIUS, PITCH_WIDTH - BALL_RADIUS),
+      x: clamp(node.x(), BALL_RADIUS, pitchWidth - BALL_RADIUS),
       y: clamp(node.y(), BALL_RADIUS, PITCH_HEIGHT - BALL_RADIUS),
     };
 
@@ -544,7 +582,7 @@ export default function TacticalBoardCanvas() {
       stage.draw();
 
       const url = stage.toDataURL({
-        // Giữ ảnh 1760 × 960 ngay cả khi sân bị thu nhỏ trên điện thoại.
+        // Xuất ảnh gấp đôi kích thước gốc: Full 1760 × 960, Half 960 × 960.
         pixelRatio: 2 / stage.scaleX(),
         mimeType: "image/png",
       });
@@ -559,7 +597,8 @@ export default function TacticalBoardCanvas() {
   function exportJson() {
     downloadJson({
       format: "futsal-tactics",
-      version: 1,
+      version: 2,
+      pitchType,
       currentFrameIndex: visibleFrameIndex,
       frames,
     });
@@ -592,6 +631,9 @@ export default function TacticalBoardCanvas() {
       stopPlayback();
       cancelDrawing();
 
+      setPitchType(document.pitchType);
+      setHasChosenPitch(true);
+      setShowPitchSelector(false);
       setFrames(document.frames);
       setActivePreset(null);
       setCurrentFrameIndex(document.currentFrameIndex);
@@ -609,9 +651,13 @@ export default function TacticalBoardCanvas() {
 
   return (
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
+    <PitchSelectorModal open={showPitchSelector} currentPitchType={pitchType}
+      canDismiss={hasChosenPitch} onSelect={choosePitch} onClose={() => setShowPitchSelector(false)} />
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
       {/* Chỉ khóa công cụ chỉnh sửa; nút tạo bài mới vẫn dùng được khi Play/Pause. */}
         <Toolbar
+          pitchType={pitchType}
+          onChangePitch={openPitchSelector}
           activeTool={activeTool}
           canUndo={currentFrame.lines.length > 0}
           onToolChange={changeTool}
@@ -619,7 +665,7 @@ export default function TacticalBoardCanvas() {
           onClearAll={clearAllLines}
           onReset={handleFullReset}
           disabled={editingLocked}
-          resetDisabled={isImporting}
+          resetDisabled={isImporting || showPitchSelector}
         />
 
 
@@ -692,7 +738,7 @@ export default function TacticalBoardCanvas() {
         <div
           className="mx-auto"
           style={{
-            width: STAGE_WIDTH * scale,
+            width: stageWidth * scale,
             height: STAGE_HEIGHT * scale,
             cursor:
               editingLocked || activeTool === "select"
@@ -703,7 +749,7 @@ export default function TacticalBoardCanvas() {
         >
           <Stage
             ref={stageRef}
-            width={STAGE_WIDTH * scale}
+            width={stageWidth * scale}
             height={STAGE_HEIGHT * scale}
             scaleX={scale}
             scaleY={scale}
@@ -718,10 +764,10 @@ export default function TacticalBoardCanvas() {
           >
             <Layer listening={false}>
               {/* Nền canvas thật để PNG không có khoảng đệm trong suốt. */}
-              <Rect width={STAGE_WIDTH} height={STAGE_HEIGHT} fill="#0F172A" />
+              <Rect width={stageWidth} height={STAGE_HEIGHT} fill="#0F172A" />
 
               <Group x={PADDING} y={PADDING}>
-                <FutsalPitch />
+                <FutsalPitch pitchType={pitchType} />
               </Group>
             </Layer>
 
@@ -743,7 +789,7 @@ export default function TacticalBoardCanvas() {
                   <PlayerToken
                     key={player.id}
                     player={player}
-                    pitchWidth={PITCH_WIDTH}
+                    pitchWidth={pitchWidth}
                     pitchHeight={PITCH_HEIGHT}
                     isDraggable={canDrag}
                     scale={scale}
@@ -793,7 +839,7 @@ export default function TacticalBoardCanvas() {
         onSpeedChange={setSpeed}
       />
     </section>
-    <PlaybookPresets disabled={isImporting || preview !== null} activePreset={activePreset} onLoad={loadPreset} />
+    <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null} activePreset={activePreset} onLoad={loadPreset} />
     </div>
   );
 }
