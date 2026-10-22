@@ -38,7 +38,8 @@ import PlayerToken from "./PlayerToken";
 import Toolbar from "./Toolbar";
 import PitchSelectorModal from "./PitchSelectorModal";
 import PlaybookPresets from "./PlaybookPresets";
-import type { PlaybookPreset } from "@/constants/presets";
+import { PRESET_FRAME_DURATION_MS, type PlaybookPreset } from "@/constants/presets";
+import { interpolatePresetFrame } from "@/lib/preset-animation";
 import { useBoardScale } from "@/hooks/useBoardScale";
 
 type DrawingEvent = KonvaEventObject<MouseEvent | TouchEvent>;
@@ -162,6 +163,7 @@ export default function TacticalBoardCanvas() {
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
+  const transitionDuration = activePreset === null ? TRANSITION_DURATION_MS : PRESET_FRAME_DURATION_MS;
 
   // Ví dụ 1.5 = đang ở giữa Frame 2 và Frame 3.
   // null = đang chỉnh sửa, không xem hoạt cảnh.
@@ -194,11 +196,15 @@ export default function TacticalBoardCanvas() {
     const from = frames[visibleFrameIndex] ?? currentFrame;
     const to = frames[visibleFrameIndex + 1] ?? from;
 
-    displayFrame = interpolateFrame(
-      from,
-      to,
-      playbackPosition - visibleFrameIndex,
-    );
+    const progress = playbackPosition - visibleFrameIndex;
+    displayFrame = activePreset === null
+      ? interpolateFrame(from, to, progress)
+      : interpolatePresetFrame(
+          frames[visibleFrameIndex - 1] ?? from,
+          from, to,
+          frames[visibleFrameIndex + 2] ?? to,
+          progress,
+        );
   }
 
   // ---------- Animation ----------
@@ -224,7 +230,7 @@ export default function TacticalBoardCanvas() {
       const elapsed = Math.min(timestamp - previousTime, 100);
       previousTime = timestamp;
 
-      position += (elapsed * speed) / TRANSITION_DURATION_MS;
+      position += (elapsed * speed) / transitionDuration;
 
       if (position >= lastIndex) {
         playbackPositionRef.current = null;
@@ -249,7 +255,7 @@ export default function TacticalBoardCanvas() {
       window.cancelAnimationFrame(requestId);
       animationRequestRef.current = null;
     };
-  }, [isPlaying, speed, frames.length]);
+  }, [isPlaying, speed, frames.length, transitionDuration]);
 
   function setDraft(line: TacticalLine | null) {
     draftRef.current = line;
@@ -304,6 +310,7 @@ export default function TacticalBoardCanvas() {
     setCurrentFrameIndex(0);
     setActiveTool("select");
     setActivePreset(preset.id);
+    setSpeed(1);
     setMessage(`Đã nạp ${preset.title}. Bấm Play để xem chuyển động.`);
   }
 
@@ -636,6 +643,7 @@ export default function TacticalBoardCanvas() {
       setShowPitchSelector(false);
       setFrames(document.frames);
       setActivePreset(null);
+      setSpeed(1);
       setCurrentFrameIndex(document.currentFrameIndex);
       setActiveTool("select");
 
@@ -825,6 +833,12 @@ export default function TacticalBoardCanvas() {
         </div>
       </div>
 
+      {activePreset !== null && (
+        <p className="px-4 py-2 text-xs text-emerald-300" role="status">
+          Bài mẫu: {Math.round(transitionDuration / speed)} ms/chuyển frame ·
+          {" "}{((frames.length - 1) * transitionDuration / speed / 1000).toFixed(1)} giây toàn bài
+        </p>
+      )}
       <FrameTimeline
         frames={frames}
         currentFrameIndex={visibleFrameIndex}
