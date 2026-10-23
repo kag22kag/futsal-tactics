@@ -9,7 +9,7 @@ export default function Home() {
   const [showIntro, setShowIntro] = useState(true);
 
   return (
-    <main className="app-shell flex h-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
+    <main className="app-shell flex h-dvh flex-col overflow-hidden bg-slate-950 text-slate-100">
       {showIntro ? (
         <IntroSplash onComplete={() => setShowIntro(false)} />
       ) : (

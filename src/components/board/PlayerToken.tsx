@@ -53,6 +53,7 @@ export default function PlayerToken({
       x={player.x}
       y={player.y}
       draggable={isDraggable}
+      dragDistance={2}
       listening={isDraggable}
       onDragMove={keepInsidePitch}
       onDragEnd={handleDragEnd}

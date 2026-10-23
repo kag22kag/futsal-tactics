@@ -716,8 +716,8 @@ export default function TacticalBoardCanvas() {
               <Toolbar activeTool={activeTool} color={drawingColor} onColorChange={color => { cancelDrawing(); setDrawingColor(color); }}
                 canUndo={currentFrame.lines.length > 0} onToolChange={changeTool}
                 onUndo={undoLine} onClearAll={clearAllLines} disabled={editingLocked} />
-              <div className="canvas-space">
-                <div ref={containerRef} className="stage-fit" aria-label="Sa bàn tương tác">
+              <div className="canvas-space touch-none">
+                <div ref={containerRef} className="stage-fit touch-none" aria-label="Sa bàn tương tác">
                   <div className="shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-800 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
                     style={{ width: stageWidth * scale, height: STAGE_HEIGHT * scale, touchAction: "none", cursor: editingLocked || activeTool === "select" ? "default" : "crosshair" }}>
           <Stage
@@ -774,6 +774,7 @@ export default function TacticalBoardCanvas() {
                   x={displayFrame.ball.x}
                   y={displayFrame.ball.y}
                   draggable={canDrag}
+                  dragDistance={2}
                   listening={canDrag}
                   onDragMove={keepBallInsidePitch}
                   onDragEnd={handleBallDragEnd}
