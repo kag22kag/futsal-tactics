@@ -39,7 +39,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid #34d399; outline-
 }
 @media (max-width: 767px) and (min-height: 501px) {
   .app-header > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
-  .app-header > div > div:first-child { grid-column: 1 / -1; }
+  .app-header > div > div:first-child { grid-column: 1; grid-row: 1; }
+  .app-header .account-menu { grid-column: 2; grid-row: 1; justify-self: end; }
   .app-header [role="group"] { grid-column: 1; grid-row: 2; order: 0; width: auto; justify-content: flex-start; }
   .app-header [role="group"] button { padding: 0 8px; font-size: 10px; }
   .app-header nav { grid-column: 2; grid-row: 2; gap: 3px; }

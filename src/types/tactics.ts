@@ -32,6 +32,21 @@ export interface Frame {
   lines: TacticalLine[];
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface SavedTactic {
+  id: string;
+  userId: string;
+  title: string;
+  pitchType: PitchType;
+  frames: Frame[];
+  createdAt: string;
+}
+
 // Định dạng file JSON do ứng dụng xuất ra.
 export interface TacticsDocument {
   format: "futsal-tactics";

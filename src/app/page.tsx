@@ -3,6 +3,7 @@
 import { useState } from "react";
 import IntroSplash from "@/components/IntroSplash";
 import TacticalBoard from "@/components/board/TacticalBoard";
+import { AccountProvider } from "@/context/AccountContext";
 
 export default function Home() {
   const [showIntro, setShowIntro] = useState(true);
@@ -12,7 +13,7 @@ export default function Home() {
       {showIntro ? (
         <IntroSplash onComplete={() => setShowIntro(false)} />
       ) : (
-        <TacticalBoard />
+        <AccountProvider><TacticalBoard /></AccountProvider>
       )}
     </main>
   );

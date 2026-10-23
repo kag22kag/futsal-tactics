@@ -9,7 +9,11 @@ import Header from "@/components/Header";
 import type { Stage as KonvaStage } from "konva/lib/Stage";
 import type { KonvaEventObject } from "konva/lib/Node";
 
-import type { Ball, DrawingTool, Frame, TacticalLine, PitchType } from "@/types/tactics";
+import type { Ball, DrawingTool, Frame, TacticalLine, PitchType, SavedTactic } from "@/types/tactics";
+import { useAccount } from "@/context/AccountContext";
+import AuthModal from "@/components/auth/AuthModal";
+import UserProfileModal from "@/components/auth/UserProfileModal";
+import MyTacticsModal from "./MyTacticsModal";
 
 import {
   BALL_RADIUS,
@@ -142,6 +146,8 @@ function TacticalShape({
 }
 
 export default function TacticalBoardCanvas() {
+  const account = useAccount();
+  const [activeDialog, setActiveDialog] = useState<"auth" | "profile" | "tactics" | null>(null);
   const [pitchType, setPitchType] = useState<PitchType>("full");
   const [hasChosenPitch, setHasChosenPitch] = useState(false);
   const [showPitchSelector, setShowPitchSelector] = useState(true);
@@ -177,7 +183,7 @@ export default function TacticalBoardCanvas() {
   const [message, setMessage] = useState("");
 
   const isPreviewing = playbackPosition !== null;
-  const editingLocked = isPreviewing || isImporting || showPitchSelector;
+  const editingLocked = isPreviewing || isImporting || showPitchSelector || activeDialog !== null;
   const canDrag = !editingLocked && activeTool === "select";
 
   // Frame luôn tồn tại vì không cho xóa frame cuối cùng.
@@ -645,17 +651,59 @@ export default function TacticalBoardCanvas() {
     }
   }
 
+  function openAccountDialog(dialog: "auth" | "profile" | "tactics") {
+    if (showPitchSelector || isImporting) return;
+    stopPlayback();
+    cancelDrawing();
+    setActiveDialog(dialog);
+  }
+
+  function saveCurrentTactic(title: string) {
+    if (isImporting || showPitchSelector || draftRef.current) throw new Error("Hãy hoàn tất thao tác trước khi lưu.");
+    account.saveTactic(title, pitchType, frames);
+    setMessage(`Đã lưu bài đánh «${title.trim()}» vào kho cá nhân.`);
+  }
+
+  function loadMyTactic(tactic: SavedTactic) {
+    if (isImporting || !account.user || tactic.userId !== account.user.id) throw new Error("Bạn không thể nạp bài đánh này.");
+    if (!window.confirm("Nạp bài này sẽ thay thế các frame đang vẽ. Tiếp tục?")) return;
+    const parsed = parseTacticsJson(JSON.stringify({
+      format: "futsal-tactics", version: 2, pitchType: tactic.pitchType,
+      currentFrameIndex: 0, frames: tactic.frames,
+    }));
+    stopPlayback();
+    cancelDrawing();
+    setFrames(parsed.frames.map(frame => cloneFrame(frame, frame.id)));
+    setPitchType(parsed.pitchType);
+    setHasChosenPitch(true);
+    setShowPitchSelector(false);
+    setCurrentFrameIndex(0);
+    setActivePreset(null);
+    setActiveTool("select");
+    setSpeed(1);
+    setActiveDialog(null);
+    setMessage(`Đã nạp «${tactic.title}» vào sa bàn.`);
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PitchSelectorModal open={showPitchSelector} currentPitchType={pitchType}
         canDismiss={hasChosenPitch} onSelect={choosePitch} onClose={() => setShowPitchSelector(false)} />
+      <AuthModal open={activeDialog === "auth"} onClose={() => setActiveDialog(null)} />
+      <UserProfileModal key={account.user?.id ?? "guest"} open={activeDialog === "profile"} onClose={() => setActiveDialog(null)} />
+      <MyTacticsModal open={activeDialog === "tactics"} onClose={() => setActiveDialog(null)}
+        onSave={saveCurrentTactic} onLoad={loadMyTactic} onRequireAuth={() => openAccountDialog("auth")} />
       <Header pitchType={pitchType} onPitchChange={choosePitch}
         disabled={isImporting || preview !== null || showPitchSelector}
         importDisabled={isPlaying || isImporting || preview !== null || showPitchSelector}
         resetDisabled={isImporting || showPitchSelector}
         onExportPng={exportPng} onExportJson={exportJson}
         onImportJson={() => fileInputRef.current?.click()} onReset={handleFullReset}
-        onOpenLibrary={() => setMobileLibraryOpen(true)} />
+        onOpenLibrary={() => setMobileLibraryOpen(true)}
+        user={account.user} onOpenAuth={() => openAccountDialog("auth")}
+        onOpenTactics={() => openAccountDialog("tactics")}
+        onOpenProfile={() => openAccountDialog("profile")}
+        onLogout={() => { account.signOut(); setMessage("Đã đăng xuất."); }} />
       <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" aria-label="Mở file chiến thuật JSON" onChange={importJson} />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Sa bàn chiến thuật">
