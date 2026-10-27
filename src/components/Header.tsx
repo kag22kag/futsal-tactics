@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, ChevronDown, Download, Goal, LogIn, LogOut, RotateCcw, Save, Upload, UserRound } from "lucide-react";
+import { BookOpen, ChevronDown, Download, Goal, Maximize2, LogIn, LogOut, RotateCcw, Save, Upload, UserRound } from "lucide-react";
 import type { PitchType, UserProfile } from "@/types/tactics";
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
   disabled: boolean;
   importDisabled: boolean;
   resetDisabled: boolean;
+  focusDisabled: boolean;
+  onEnterFocus: () => void;
   onPitchChange: (type: PitchType) => void;
   onExportPng: () => void;
   onExportJson: () => void;
@@ -59,6 +61,7 @@ export default function Header(props: Props) {
           <button className="header-action bg-slate-900 text-slate-300 hover:bg-slate-800" disabled={props.disabled} onClick={props.onExportJson} title="Lưu JSON" aria-label="Lưu JSON"><Save size={17} /><span className="hidden xl:inline">Lưu JSON</span></button>
           <button className="header-action bg-slate-900 text-slate-300 hover:bg-slate-800" disabled={props.importDisabled} onClick={props.onImportJson} title="Mở JSON" aria-label="Mở JSON"><Upload size={17} /><span className="hidden xl:inline">Mở JSON</span></button>
           <button className="header-action bg-slate-900 text-slate-400 hover:bg-rose-500/15 hover:text-rose-300" disabled={props.resetDisabled} onClick={props.onReset} title="Reset · Tạo bài mới" aria-label="Reset · Tạo bài mới"><RotateCcw size={17} /><span className="hidden xl:inline">Reset</span></button>
+          <button type="button" className="header-action bg-slate-900 text-slate-300 hover:bg-slate-800" disabled={props.focusDisabled} onClick={props.onEnterFocus} title="Chế độ trình chiếu / Fullscreen" aria-label="Chế độ trình chiếu / Fullscreen"><Maximize2 size={17} /><span className="hidden 2xl:inline">Trình chiếu</span></button>
           <button className="header-action bg-slate-900 text-emerald-400 lg:hidden" onClick={props.onOpenLibrary} title="Mở thư viện bài mẫu" aria-label="Mở thư viện bài mẫu"><BookOpen size={17} /></button>
         </nav>
         <div className="account-menu relative" ref={menuRef}>

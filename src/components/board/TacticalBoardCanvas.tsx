@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Arrow, Circle, Group, Layer, Line, Rect, Stage } from "react-konva";
 
 import Header from "@/components/Header";
-import { ChevronDown, ChevronUp, Film } from "lucide-react";
+import { ChevronDown, ChevronUp, Film, Minimize2 } from "lucide-react";
 
 import type { Stage as KonvaStage } from "konva/lib/Stage";
 import type { KonvaEventObject } from "konva/lib/Node";
@@ -146,7 +146,13 @@ function TacticalShape({
   );
 }
 
-export default function TacticalBoardCanvas() {
+interface PresentationProps {
+  isFocusMode: boolean;
+  onEnterFocus: () => void;
+  onExitFocus: () => void;
+}
+
+export default function TacticalBoardCanvas({ isFocusMode, onEnterFocus, onExitFocus }: PresentationProps) {
   const account = useAccount();
   const [activeDialog, setActiveDialog] = useState<"auth" | "profile" | "tactics" | null>(null);
   const [pitchType, setPitchType] = useState<PitchType>("full");
@@ -688,14 +694,29 @@ export default function TacticalBoardCanvas() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className={isFocusMode
+      ? "fixed inset-0 z-50 flex h-dvh w-screen flex-col overflow-hidden bg-slate-950 p-2"
+      : "flex min-h-0 flex-1 flex-col overflow-hidden"}>
+      {isFocusMode && (
+        <button
+          type="button"
+          onClick={onExitFocus}
+          className="fixed right-4 top-4 z-[60] flex min-h-10 items-center gap-2 rounded-lg border border-slate-600/60 bg-slate-950/75 px-3 text-xs text-slate-200 backdrop-blur hover:bg-slate-800"
+          aria-label="Thoát chế độ trình chiếu"
+          title="Thoát chế độ trình chiếu (Esc)"
+        >
+          <Minimize2 size={16} /> Thoát (Esc)
+        </button>
+      )}
       <PitchSelectorModal open={showPitchSelector} currentPitchType={pitchType}
         canDismiss={hasChosenPitch} onSelect={choosePitch} onClose={() => setShowPitchSelector(false)} />
       <AuthModal open={activeDialog === "auth"} onClose={() => setActiveDialog(null)} />
       <UserProfileModal key={account.user?.id ?? "guest"} open={activeDialog === "profile"} onClose={() => setActiveDialog(null)} />
       <MyTacticsModal open={activeDialog === "tactics"} onClose={() => setActiveDialog(null)}
         onSave={saveCurrentTactic} onLoad={loadMyTactic} onRequireAuth={() => openAccountDialog("auth")} />
-      <Header pitchType={pitchType} onPitchChange={choosePitch}
+      {!isFocusMode && <Header pitchType={pitchType} onPitchChange={choosePitch}
+        focusDisabled={isImporting || showPitchSelector || activeDialog !== null}
+        onEnterFocus={onEnterFocus}
         disabled={isImporting || preview !== null || showPitchSelector}
         importDisabled={isPlaying || isImporting || preview !== null || showPitchSelector}
         resetDisabled={isImporting || showPitchSelector}
@@ -705,20 +726,22 @@ export default function TacticalBoardCanvas() {
         user={account.user} onOpenAuth={() => openAccountDialog("auth")}
         onOpenTactics={() => openAccountDialog("tactics")}
         onOpenProfile={() => openAccountDialog("profile")}
-        onLogout={() => { account.signOut(); setMessage("Đã đăng xuất."); }} />
+        onLogout={() => { account.signOut(); setMessage("Đã đăng xuất."); }} />}
       <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" aria-label="Mở file chiến thuật JSON" onChange={importJson} />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Sa bàn chiến thuật">
-          <div className="workspace-grid flex min-h-0 flex-1 flex-col">
-            <div className="workspace-heading flex h-12 shrink-0 items-center justify-between gap-3 px-5">
+          <div className={isFocusMode
+            ? "relative flex min-h-0 flex-1 flex-col"
+            : "workspace-grid flex min-h-0 flex-1 flex-col"}>
+            {!isFocusMode && <div className="workspace-heading flex h-12 shrink-0 items-center justify-between gap-3 px-5">
               <div className="flex items-center gap-2 text-[10px] font-semibold tracking-widest text-slate-500"><span className={`size-1.5 rounded-full ${isPlaying ? "bg-emerald-400" : "bg-slate-500"}`} /> {isPlaying ? "ANIMATION LIVE" : "TACTICAL WORKSPACE"}</div>
               <span className="rounded-md border border-slate-800 bg-slate-900/60 px-2 py-1 font-mono text-[10px] text-slate-400">{pitchType === "full" ? "FULL COURT · 40 × 20 M" : "HALF COURT · 20 × 20 M"}</span>
-            </div>
+            </div>}
             <div className="relative min-h-0 flex-1">
-              <Toolbar activeTool={activeTool} color={drawingColor} onColorChange={color => { cancelDrawing(); setDrawingColor(color); }}
+              {!isFocusMode && <Toolbar activeTool={activeTool} color={drawingColor} onColorChange={color => { cancelDrawing(); setDrawingColor(color); }}
                 canUndo={currentFrame.lines.length > 0} onToolChange={changeTool}
-                onUndo={undoLine} onClearAll={clearAllLines} disabled={editingLocked} />
-              <div className="canvas-space touch-none">
+                onUndo={undoLine} onClearAll={clearAllLines} disabled={editingLocked} />}
+              <div className={isFocusMode ? "absolute inset-0 touch-none" : "canvas-space touch-none"}>
                 <div ref={containerRef} className="stage-fit touch-none" aria-label="Sa bàn tương tác">
                   <div className="shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-800 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
                     style={{ width: stageWidth * scale, height: STAGE_HEIGHT * scale, touchAction: "none", cursor: editingLocked || activeTool === "select" ? "default" : "crosshair" }}>
@@ -802,11 +825,12 @@ export default function TacticalBoardCanvas() {
                 </div>
               </div>
             </div>
-            <div className="workspace-status flex h-9 shrink-0 items-center justify-between gap-4 px-5 text-[11px] text-slate-500">
+            {!isFocusMode && <div className="workspace-status flex h-9 shrink-0 items-center justify-between gap-4 px-5 text-[11px] text-slate-500">
               <p role="status" className="min-w-0 truncate" title={message}>{message || (isPreviewing ? isPlaying ? "Đang phát hoạt cảnh…" : "Đã tạm dừng. Chọn một frame để tiếp tục chỉnh sửa." : TOOL_HINTS[activeTool])}</p>
               <span className="hidden shrink-0 items-center gap-3 sm:flex"><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-red-400" /> HOME</span><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-blue-400" /> AWAY</span><span>{activePreset !== null ? `${Math.round(transitionDuration / speed)} ms/frame` : `${displayFrame.lines.length} nét vẽ`}</span></span>
-            </div>
+            </div>}
           </div>
+          {!isFocusMode && <>
           {/* This button stays visible even while the timeline is collapsed. */}
           <div className="relative z-10 flex shrink-0 justify-center border-t border-slate-800 bg-slate-950/90">
             <button
@@ -834,11 +858,12 @@ export default function TacticalBoardCanvas() {
                 onTogglePlay={togglePlayback} onSpeedChange={setSpeed} />
             </div>
           </div>
+          </>}
         </section>
-        <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null || showPitchSelector}
+        {!isFocusMode && <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null || showPitchSelector}
           activePreset={activePreset} onLoad={loadPreset} expanded={sidebarExpanded}
           mobileOpen={mobileLibraryOpen} onToggleExpanded={() => setSidebarExpanded(value => !value)}
-          onCloseMobile={() => setMobileLibraryOpen(false)} />
+          onCloseMobile={() => setMobileLibraryOpen(false)} />}
       </div>
     </div>
   );
