@@ -23,8 +23,9 @@ export function useBoardScale(stageWidth = STAGE_WIDTH, stageHeight = STAGE_HEIG
       animationFrame = window.requestAnimationFrame(() => {
         // The canvas fits the board area left after the header, toolbar and timeline.
         const viewport = window.visualViewport;
-        const width = Math.min(node.clientWidth, window.innerWidth, viewport?.width ?? Infinity);
-        const height = Math.min(node.clientHeight, window.innerHeight, viewport?.height ?? Infinity);
+        const bounds = node.getBoundingClientRect();
+        const width = Math.min(bounds.width, window.innerWidth, viewport?.width ?? Infinity);
+        const height = Math.min(bounds.height, window.innerHeight, viewport?.height ?? Infinity);
         setSpace(previous =>
           previous.width === width && previous.height === height ? previous : { width, height },
         );

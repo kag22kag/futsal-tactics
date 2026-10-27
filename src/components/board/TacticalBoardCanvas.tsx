@@ -47,7 +47,7 @@ import { PRESET_FRAME_DURATION_MS, type PlaybookPreset } from "@/constants/prese
 import { interpolatePresetFrame } from "@/lib/preset-animation";
 import { useBoardScale } from "@/hooks/useBoardScale";
 
-type DrawingEvent = KonvaEventObject<MouseEvent | TouchEvent>;
+type DrawingEvent = KonvaEventObject<MouseEvent | TouchEvent | PointerEvent>;
 
 interface Point {
   x: number;
@@ -67,15 +67,25 @@ const TOOL_HINTS: Record<DrawingTool, string> = {
 
 function getPitchPoint(event: DrawingEvent): Point | null {
   const stage = event.target.getStage();
-  const pointer = stage?.getPointerPosition();
+  if (!stage) return null;
 
-  if (!pointer || !stage) {
-    return null;
-  }
+  const nativeEvent = event.evt;
+  // touchend has no active touches, so use changedTouches for the last point.
+  const touch = "touches" in nativeEvent
+    ? nativeEvent.touches[0] ?? nativeEvent.changedTouches[0]
+    : null;
+  const clientX = touch?.clientX ?? ("clientX" in nativeEvent ? nativeEvent.clientX : NaN);
+  const clientY = touch?.clientY ?? ("clientY" in nativeEvent ? nativeEvent.clientY : NaN);
+  const bounds = stage.container().getBoundingClientRect();
 
+  if (!Number.isFinite(clientX) || !Number.isFinite(clientY) ||
+      bounds.width <= 0 || bounds.height <= 0 ||
+      stage.scaleX() === 0 || stage.scaleY() === 0) return null;
+
+  // Measure the live stage bounds on every input: rotation moves and resizes it.
   return {
-    x: pointer.x / stage.scaleX() - PADDING,
-    y: pointer.y / stage.scaleY() - PADDING,
+    x: (clientX - bounds.left) * stage.width() / bounds.width / stage.scaleX() - PADDING,
+    y: (clientY - bounds.top) * stage.height() / bounds.height / stage.scaleY() - PADDING,
   };
 }
 
@@ -169,6 +179,35 @@ export default function TacticalBoardCanvas({ isFocusMode, onEnterFocus, onExitF
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
   const [showFrameBar, setShowFrameBar] = useState(true);
+  const frameBarBeforeLandscape = useRef(true);
+
+  useEffect(() => {
+    const query = window.matchMedia("(orientation: landscape) and (max-width: 1024px) and (max-height: 600px)");
+    let wasLandscape = false;
+    function syncOrientation() {
+      const landscape = query.matches;
+      if (landscape !== wasLandscape) {
+        if (landscape) {
+          setShowFrameBar(current => {
+            frameBarBeforeLandscape.current = current;
+            return false;
+          });
+        } else {
+          setShowFrameBar(frameBarBeforeLandscape.current);
+        }
+        wasLandscape = landscape;
+      }
+    }
+    syncOrientation();
+    query.addEventListener("change", syncOrientation);
+    window.addEventListener("orientationchange", syncOrientation);
+    window.addEventListener("resize", syncOrientation);
+    return () => {
+      query.removeEventListener("change", syncOrientation);
+      window.removeEventListener("orientationchange", syncOrientation);
+      window.removeEventListener("resize", syncOrientation);
+    };
+  }, []);
   const [activeTool, setActiveTool] = useState<DrawingTool>("select");
 
   const [preview, setPreview] = useState<TacticalLine | null>(null);
@@ -427,11 +466,6 @@ export default function TacticalBoardCanvas({ isFocusMode, onEnterFocus, onExitF
     }
 
     if ("button" in event.evt && event.evt.button !== 0) {
-      return;
-    }
-
-    if ("touches" in event.evt && event.evt.touches.length !== 1) {
-      cancelDrawing();
       return;
     }
 
@@ -741,8 +775,8 @@ export default function TacticalBoardCanvas({ isFocusMode, onEnterFocus, onExitF
               {!isFocusMode && <Toolbar activeTool={activeTool} color={drawingColor} onColorChange={color => { cancelDrawing(); setDrawingColor(color); }}
                 canUndo={currentFrame.lines.length > 0} onToolChange={changeTool}
                 onUndo={undoLine} onClearAll={clearAllLines} disabled={editingLocked} />}
-              <div className={isFocusMode ? "absolute inset-0 touch-none" : "canvas-space touch-none"}>
-                <div ref={containerRef} className="stage-fit touch-none" aria-label="Sa bàn tương tác">
+              <div className={isFocusMode ? "absolute inset-0 touch-none select-none" : "canvas-space touch-none select-none"}>
+                <div ref={containerRef} className="stage-fit touch-none select-none" aria-label="Sa bàn tương tác">
                   <div className="shrink-0 overflow-hidden rounded-2xl ring-1 ring-slate-800 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
                     style={{ width: stageWidth * scale, height: STAGE_HEIGHT * scale, touchAction: "none", cursor: editingLocked || activeTool === "select" ? "default" : "crosshair" }}>
           <Stage
@@ -757,6 +791,7 @@ export default function TacticalBoardCanvas({ isFocusMode, onEnterFocus, onExitF
             onMouseLeave={cancelDrawing}
             onTouchStart={handleDrawingStart}
             onTouchMove={handleDrawingMove}
+            onPointerMove={handleDrawingMove}
             onTouchEnd={handleDrawingEnd}
             onTouchCancel={cancelDrawing}
           >
