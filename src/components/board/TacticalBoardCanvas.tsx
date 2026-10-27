@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Arrow, Circle, Group, Layer, Line, Rect, Stage } from "react-konva";
 
 import Header from "@/components/Header";
+import { ChevronDown, ChevronUp, Film } from "lucide-react";
 
 import type { Stage as KonvaStage } from "konva/lib/Stage";
 import type { KonvaEventObject } from "konva/lib/Node";
@@ -161,6 +162,7 @@ export default function TacticalBoardCanvas() {
   const [drawingColor, setDrawingColor] = useState("#FFFFFF");
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [mobileLibraryOpen, setMobileLibraryOpen] = useState(false);
+  const [showFrameBar, setShowFrameBar] = useState(true);
   const [activeTool, setActiveTool] = useState<DrawingTool>("select");
 
   const [preview, setPreview] = useState<TacticalLine | null>(null);
@@ -805,10 +807,33 @@ export default function TacticalBoardCanvas() {
               <span className="hidden shrink-0 items-center gap-3 sm:flex"><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-red-400" /> HOME</span><span className="flex items-center gap-1.5"><i className="size-2 rounded-full bg-blue-400" /> AWAY</span><span>{activePreset !== null ? `${Math.round(transitionDuration / speed)} ms/frame` : `${displayFrame.lines.length} nét vẽ`}</span></span>
             </div>
           </div>
-          <FrameTimeline pitchType={pitchType} frames={frames} currentFrameIndex={visibleFrameIndex}
-            isPlaying={isPlaying} isPreviewing={isPreviewing} busy={isImporting || showPitchSelector}
-            speed={speed} onSelect={selectFrame} onAdd={addFrame} onDelete={deleteFrame}
-            onTogglePlay={togglePlayback} onSpeedChange={setSpeed} />
+          {/* This button stays visible even while the timeline is collapsed. */}
+          <div className="relative z-10 flex shrink-0 justify-center border-t border-slate-800 bg-slate-950/90">
+            <button
+              type="button"
+              aria-controls="frame-timeline"
+              aria-expanded={showFrameBar}
+              onClick={() => setShowFrameBar(visible => !visible)}
+              className="flex min-h-11 items-center gap-1.5 rounded-t-lg px-4 text-xs font-semibold text-emerald-300 transition-colors hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            >
+              <Film size={15} aria-hidden="true" />
+              {showFrameBar ? "Ẩn Frame" : "Hiện Frame"}
+              {showFrameBar ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronUp size={16} aria-hidden="true" />}
+            </button>
+          </div>
+          {/* 0fr hides the panel; the wrapper removes its minimum content height. */}
+          <div
+            id="frame-timeline"
+            className={`grid shrink-0 overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none ${showFrameBar ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+            aria-hidden={!showFrameBar}
+          >
+            <div className="min-h-0 overflow-hidden" inert={!showFrameBar}>
+              <FrameTimeline pitchType={pitchType} frames={frames} currentFrameIndex={visibleFrameIndex}
+                isPlaying={isPlaying} isPreviewing={isPreviewing} busy={isImporting || showPitchSelector}
+                speed={speed} onSelect={selectFrame} onAdd={addFrame} onDelete={deleteFrame}
+                onTogglePlay={togglePlayback} onSpeedChange={setSpeed} />
+            </div>
+          </div>
         </section>
         <PlaybookPresets pitchType={pitchType} disabled={isImporting || preview !== null || showPitchSelector}
           activePreset={activePreset} onLoad={loadPreset} expanded={sidebarExpanded}
